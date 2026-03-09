@@ -618,3 +618,4 @@ app.delete('/api/administradores/:id', auth, async (req, res) => {
 //  START
 // =============================================================
 app.listen(PORT, () => console.log(`Servidor ZZO rodando na porta ${PORT}`));
+// trigger redeploy Mon Mar  9 13:47:17 -03 2026
