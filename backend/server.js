@@ -614,8 +614,28 @@ app.delete('/api/administradores/:id', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ erro: err.message || String(err) }); }
 });
 
+// PUT /api/administradores/:id
+app.put('/api/administradores/:id', auth, async (req, res) => {
+  try {
+    const { Nome, Email, Senha } = req.body;
+    if (!Nome || !Email) return res.status(400).json({ erro: 'Nome e Email são obrigatórios' });
+
+    const [[existe]] = await db.query(
+      'SELECT ID FROM Administradores WHERE Email = ? AND ID != ?', [Email, req.params.id]
+    );
+    if (existe) return res.status(409).json({ erro: 'Email já está em uso' });
+
+    if (Senha) {
+      const hash = await require('bcryptjs').hash(Senha, 10);
+      await db.query('UPDATE Administradores SET Nome=?, Email=?, Senha=? WHERE ID=?', [Nome, Email, hash, req.params.id]);
+    } else {
+      await db.query('UPDATE Administradores SET Nome=?, Email=? WHERE ID=?', [Nome, Email, req.params.id]);
+    }
+    res.json({ sucesso: true });
+  } catch (err) { res.status(500).json({ erro: err.message || String(err) }); }
+});
+
 // =============================================================
 //  START
 // =============================================================
 app.listen(PORT, () => console.log(`Servidor ZZO rodando na porta ${PORT}`));
-// trigger redeploy Mon Mar  9 13:47:17 -03 2026

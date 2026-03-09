@@ -320,6 +320,15 @@ export const useAdminStore = create((set) => ({
     }
   },
 
+  editarAdmin: async (id, admin) => {
+    try {
+      await api.put(`/administradores/${id}`, admin);
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro || 'Erro ao editar admin' };
+    }
+  },
+
   deletarAdmin: async (id) => {
     try {
       await api.delete(`/administradores/${id}`);
