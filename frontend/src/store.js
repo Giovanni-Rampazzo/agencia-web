@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import api from './api';
 
-// ─── AUTH ────────────────────────────────────────────────────────────────────
 export const useAuthStore = create((set) => ({
   usuario: null,
   token: localStorage.getItem('token') || null,
@@ -25,23 +24,15 @@ export const useAuthStore = create((set) => ({
     set({ usuario: null, token: null });
   },
 
-  // FIX: decodifica o JWT para recuperar dados do usuário após refresh
   carregarUsuario: () => {
     const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        set({ token, usuario: { id: payload.id, nome: payload.nome, email: payload.email } });
-      } catch {
-        set({ token });
-      }
-    }
+    if (token) set({ token });
   }
 }));
 
-// ─── CLIENTES ────────────────────────────────────────────────────────────────
 export const useClientesStore = create((set) => ({
   clientes: [],
+  statuses: [],
   loading: false,
 
   fetchClientes: async (status = null) => {
@@ -52,6 +43,15 @@ export const useClientesStore = create((set) => ({
       set({ clientes: data, loading: false });
     } catch (error) {
       set({ loading: false });
+      console.error(error);
+    }
+  },
+
+  fetchStatuses: async () => {
+    try {
+      const { data } = await api.get('/clientes/status/lista');
+      set({ statuses: data });
+    } catch (error) {
       console.error(error);
     }
   },
@@ -90,17 +90,112 @@ export const useClientesStore = create((set) => ({
   }
 }));
 
-// ─── CAMPANHAS ───────────────────────────────────────────────────────────────
-// FIX: store de campanhas criada do zero (estava completamente ausente)
+export const useTarefasStore = create((set) => ({
+  tarefas: [],
+  loading: false,
+
+  fetchTarefas: async () => {
+    set({ loading: true });
+    try {
+      const { data } = await api.get('/tarefas');
+      set({ tarefas: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      console.error(error);
+    }
+  },
+
+  adicionarTarefa: async (tarefa) => {
+    try {
+      await api.post('/tarefas', tarefa);
+      const { data } = await api.get('/tarefas');
+      set({ tarefas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  atualizarTarefa: async (id, tarefa) => {
+    try {
+      await api.put(`/tarefas/${id}`, tarefa);
+      const { data } = await api.get('/tarefas');
+      set({ tarefas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  deletarTarefa: async (id) => {
+    try {
+      await api.delete(`/tarefas/${id}`);
+      const { data } = await api.get('/tarefas');
+      set({ tarefas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  }
+}));
+
+export const useJobsStore = create((set) => ({
+  jobs: [],
+  loading: false,
+
+  fetchJobs: async () => {
+    set({ loading: true });
+    try {
+      const { data } = await api.get('/jobs');
+      set({ jobs: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      console.error(error);
+    }
+  },
+
+  adicionarJob: async (job) => {
+    try {
+      await api.post('/jobs', job);
+      const { data } = await api.get('/jobs');
+      set({ jobs: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  atualizarJob: async (id, job) => {
+    try {
+      await api.put(`/jobs/${id}`, job);
+      const { data } = await api.get('/jobs');
+      set({ jobs: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  deletarJob: async (id) => {
+    try {
+      await api.delete(`/jobs/${id}`);
+      const { data } = await api.get('/jobs');
+      set({ jobs: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  }
+}));
+
 export const useCampanhasStore = create((set) => ({
   campanhas: [],
   loading: false,
 
-  fetchCampanhas: async (cliente_id = null) => {
+  fetchCampanhas: async () => {
     set({ loading: true });
     try {
-      const params = cliente_id ? { cliente_id } : {};
-      const { data } = await api.get('/campanhas', { params });
+      const { data } = await api.get('/campanhas');
       set({ campanhas: data, loading: false });
     } catch (error) {
       set({ loading: false });
@@ -142,113 +237,7 @@ export const useCampanhasStore = create((set) => ({
   }
 }));
 
-// ─── TAREFAS ─────────────────────────────────────────────────────────────────
-export const useTarefasStore = create((set) => ({
-  tarefas: [],
-  loading: false,
-
-  fetchTarefas: async () => {
-    set({ loading: true });
-    try {
-      const { data } = await api.get('/tarefas');
-      set({ tarefas: data, loading: false });
-    } catch (error) {
-      set({ loading: false });
-      console.error(error);
-    }
-  },
-
-  adicionarTarefa: async (tarefa) => {
-    try {
-      await api.post('/tarefas', tarefa);
-      const { data } = await api.get('/tarefas');
-      set({ tarefas: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  },
-
-  atualizarTarefa: async (id, tarefa) => {
-    try {
-      // FIX: envia apenas os campos que o backend espera
-      const { Tarefa, Prioridade, Prazo, Status, FK_Job, FK_Cliente } = tarefa;
-      await api.put(`/tarefas/${id}`, { Tarefa, Prioridade, Prazo: Prazo || null, Status, FK_Job: FK_Job || null, FK_Cliente: FK_Cliente || null });
-      const { data } = await api.get('/tarefas');
-      set({ tarefas: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  },
-
-  deletarTarefa: async (id) => {
-    try {
-      await api.delete(`/tarefas/${id}`);
-      const { data } = await api.get('/tarefas');
-      set({ tarefas: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  }
-}));
-
-// ─── JOBS ────────────────────────────────────────────────────────────────────
-export const useJobsStore = create((set) => ({
-  jobs: [],
-  loading: false,
-
-  fetchJobs: async () => {
-    set({ loading: true });
-    try {
-      const { data } = await api.get('/jobs');
-      set({ jobs: data, loading: false });
-    } catch (error) {
-      set({ loading: false });
-      console.error(error);
-    }
-  },
-
-  adicionarJob: async (job) => {
-    try {
-      // FIX: envia apenas FK_Campanha (modelo SaaS — cliente vem pelo join da campanha)
-      const { Descricao, Status, FK_Campanha } = job;
-      await api.post('/jobs', { Descricao, Status, FK_Campanha });
-      const { data } = await api.get('/jobs');
-      set({ jobs: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  },
-
-  atualizarJob: async (id, job) => {
-    try {
-      const { Descricao, Status, FK_Campanha } = job;
-      await api.put(`/jobs/${id}`, { Descricao, Status, FK_Campanha });
-      const { data } = await api.get('/jobs');
-      set({ jobs: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  },
-
-  deletarJob: async (id) => {
-    try {
-      await api.delete(`/jobs/${id}`);
-      const { data } = await api.get('/jobs');
-      set({ jobs: data });
-      return { sucesso: true };
-    } catch (error) {
-      return { sucesso: false, erro: error.response?.data?.erro };
-    }
-  }
-}));
-
-// ─── PAGAMENTOS ──────────────────────────────────────────────────────────────
-export const usePagamentosStore = create((set, get) => ({
+export const usePagamentosStore = create((set) => ({
   pagamentos: [],
   stats: null,
   loading: false,
@@ -278,8 +267,6 @@ export const usePagamentosStore = create((set, get) => ({
       await api.post('/pagamentos', pagamento);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
-      // FIX: atualiza stats automaticamente após adicionar
-      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
@@ -291,7 +278,6 @@ export const usePagamentosStore = create((set, get) => ({
       await api.put(`/pagamentos/${id}`, pagamento);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
-      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
@@ -303,11 +289,43 @@ export const usePagamentosStore = create((set, get) => ({
       await api.delete(`/pagamentos/${id}`);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
-      // FIX: atualiza stats automaticamente após deletar
-      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  }
+}));
+
+export const useAdminStore = create((set) => ({
+  admins: [],
+  loading: false,
+
+  fetchAdmins: async () => {
+    set({ loading: true });
+    try {
+      const { data } = await api.get('/administradores');
+      set({ admins: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      console.error(error);
+    }
+  },
+
+  adicionarAdmin: async (admin) => {
+    try {
+      await api.post('/administradores', admin);
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro || 'Erro ao criar admin' };
+    }
+  },
+
+  deletarAdmin: async (id) => {
+    try {
+      await api.delete(`/administradores/${id}`);
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro || 'Erro ao deletar admin' };
     }
   }
 }));

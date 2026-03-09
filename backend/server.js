@@ -548,6 +548,72 @@ app.delete('/api/tarefas/:id', auth, async (req, res) => {
   } catch (err) { console.error('ERRO LOGIN:', err); res.status(500).json({ erro: err.message || String(err) }); }
 });
 
+
+// =============================================================
+//  SETUP — Cria tabela Jobs se não existir
+// =============================================================
+(async () => {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS Jobs (
+        ID INT AUTO_INCREMENT PRIMARY KEY,
+        Descricao VARCHAR(255) NOT NULL,
+        Status VARCHAR(50) DEFAULT 'Pendente',
+        FK_Campanha INT NOT NULL,
+        CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (FK_Campanha) REFERENCES Campanhas(ID) ON DELETE CASCADE
+      )
+    `);
+    console.log('Tabela Jobs OK');
+  } catch (err) {
+    console.error('Erro ao criar tabela Jobs:', err.message);
+  }
+})();
+
+// =============================================================
+//  ADMINISTRADORES
+// =============================================================
+
+// GET /api/administradores
+app.get('/api/administradores', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT ID, Nome, Email, CreatedAt FROM Administradores ORDER BY ID ASC'
+    );
+    res.json(rows);
+  } catch (err) { res.status(500).json({ erro: err.message || String(err) }); }
+});
+
+// POST /api/administradores
+app.post('/api/administradores', auth, async (req, res) => {
+  try {
+    const { Nome, Email, Senha } = req.body;
+    if (!Nome || !Email || !Senha)
+      return res.status(400).json({ erro: 'Nome, Email e Senha são obrigatórios' });
+
+    const [[existe]] = await db.query('SELECT ID FROM Administradores WHERE Email = ?', [Email]);
+    if (existe) return res.status(409).json({ erro: 'Email já cadastrado' });
+
+    const hash = await require('bcryptjs').hash(Senha, 10);
+    const [r] = await db.query(
+      'INSERT INTO Administradores (Nome, Email, Senha) VALUES (?, ?, ?)',
+      [Nome, Email, hash]
+    );
+    res.status(201).json({ sucesso: true, id: r.insertId });
+  } catch (err) { res.status(500).json({ erro: err.message || String(err) }); }
+});
+
+// DELETE /api/administradores/:id
+app.delete('/api/administradores/:id', auth, async (req, res) => {
+  try {
+    if (String(req.params.id) === String(req.admin.id))
+      return res.status(400).json({ erro: 'Você não pode excluir sua própria conta' });
+    const [r] = await db.query('DELETE FROM Administradores WHERE ID = ?', [req.params.id]);
+    if (r.affectedRows === 0) return res.status(404).json({ erro: 'Admin não encontrado' });
+    res.json({ sucesso: true });
+  } catch (err) { res.status(500).json({ erro: err.message || String(err) }); }
+});
+
 // =============================================================
 //  START
 // =============================================================

@@ -3,10 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute';
 import Layout from './components/Layout';
 
-// Login fica em src/ direto
 import Login from './Login';
 
-// Pages — ficam em src/pages/
 import Dashboard from './pages/Dashboard';
 import Clientes from './pages/Clientes';
 import ClienteDetalhes from './pages/ClienteDetalhes';
@@ -17,6 +15,7 @@ import Jobs from './pages/Jobs';
 import JobDetalhes from './pages/JobDetalhes';
 import Pagamentos from './pages/Pagamentos';
 import PagamentoDetalhes from './pages/PagamentoDetalhes';
+import Administradores from './pages/Administradores';
 
 function App() {
   return (
@@ -58,6 +57,10 @@ function App() {
 
         <Route path="/tarefas" element={
           <ProtectedRoute><Layout><Tarefas /></Layout></ProtectedRoute>
+        }/>
+
+        <Route path="/administradores" element={
+          <ProtectedRoute><Layout><Administradores /></Layout></ProtectedRoute>
         }/>
 
         <Route path="/" element={<Navigate to="/dashboard" />} />

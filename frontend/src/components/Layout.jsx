@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { BarChart3, Users, CheckSquare, Briefcase, DollarSign, LogOut, Menu, X, Megaphone } from 'lucide-react';
+import { BarChart3, Users, CheckSquare, Briefcase, DollarSign, LogOut, Menu, X, Megaphone, ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '../store';
 import { theme } from '../theme';
 
@@ -11,12 +11,13 @@ export default function Layout({ children }) {
   const { usuario, logout } = useAuthStore();
 
   const menu = [
-    { label: 'Dashboard',  icon: BarChart3,   path: '/dashboard' },
-    { label: 'Clientes',   icon: Users,       path: '/clientes' },
-    { label: 'Campanhas',  icon: Megaphone,   path: '/campanhas' },
-    { label: 'Jobs',       icon: Briefcase,   path: '/jobs' },
-    { label: 'Pagamentos', icon: DollarSign,  path: '/pagamentos' },
-    { label: 'Tarefas',    icon: CheckSquare, path: '/tarefas' },
+    { label: 'Dashboard',        icon: BarChart3,    path: '/dashboard' },
+    { label: 'Clientes',         icon: Users,        path: '/clientes' },
+    { label: 'Campanhas',        icon: Megaphone,    path: '/campanhas' },
+    { label: 'Jobs',             icon: Briefcase,    path: '/jobs' },
+    { label: 'Pagamentos',       icon: DollarSign,   path: '/pagamentos' },
+    { label: 'Tarefas',          icon: CheckSquare,  path: '/tarefas' },
+    { label: 'Administradores',  icon: ShieldCheck,  path: '/administradores' },
   ];
 
   return (
@@ -60,7 +61,7 @@ export default function Layout({ children }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto bg-slate-900">
+      <main className="flex-1 overflow-auto bg-slate-900 p-6">
         {children}
       </main>
     </div>
