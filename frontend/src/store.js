@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from './api';
 
+// ─── AUTH ────────────────────────────────────────────────────────────────────
 export const useAuthStore = create((set) => ({
   usuario: null,
   token: localStorage.getItem('token') || null,
@@ -24,17 +25,23 @@ export const useAuthStore = create((set) => ({
     set({ usuario: null, token: null });
   },
 
+  // FIX: decodifica o JWT para recuperar dados do usuário após refresh
   carregarUsuario: () => {
     const token = localStorage.getItem('token');
     if (token) {
-      set({ token });
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        set({ token, usuario: { id: payload.id, nome: payload.nome, email: payload.email } });
+      } catch {
+        set({ token });
+      }
     }
   }
 }));
 
+// ─── CLIENTES ────────────────────────────────────────────────────────────────
 export const useClientesStore = create((set) => ({
   clientes: [],
-  statuses: [],
   loading: false,
 
   fetchClientes: async (status = null) => {
@@ -45,22 +52,6 @@ export const useClientesStore = create((set) => ({
       set({ clientes: data, loading: false });
     } catch (error) {
       set({ loading: false });
-      console.error(error);
-    }
-  },
-
-  fetchStats: async () => {
-    try {
-      const { data } = await api.get('/clientes/stats/resumo');
-      set({ stats: data });
-    } catch (error) { console.error(error); }
-  },
-
-  fetchStatuses: async () => {
-    try {
-      const { data } = await api.get('/clientes/status/lista');
-      set({ statuses: data });
-    } catch (error) {
       console.error(error);
     }
   },
@@ -99,6 +90,59 @@ export const useClientesStore = create((set) => ({
   }
 }));
 
+// ─── CAMPANHAS ───────────────────────────────────────────────────────────────
+// FIX: store de campanhas criada do zero (estava completamente ausente)
+export const useCampanhasStore = create((set) => ({
+  campanhas: [],
+  loading: false,
+
+  fetchCampanhas: async (cliente_id = null) => {
+    set({ loading: true });
+    try {
+      const params = cliente_id ? { cliente_id } : {};
+      const { data } = await api.get('/campanhas', { params });
+      set({ campanhas: data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      console.error(error);
+    }
+  },
+
+  adicionarCampanha: async (campanha) => {
+    try {
+      await api.post('/campanhas', campanha);
+      const { data } = await api.get('/campanhas');
+      set({ campanhas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  atualizarCampanha: async (id, campanha) => {
+    try {
+      await api.put(`/campanhas/${id}`, campanha);
+      const { data } = await api.get('/campanhas');
+      set({ campanhas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  },
+
+  deletarCampanha: async (id) => {
+    try {
+      await api.delete(`/campanhas/${id}`);
+      const { data } = await api.get('/campanhas');
+      set({ campanhas: data });
+      return { sucesso: true };
+    } catch (error) {
+      return { sucesso: false, erro: error.response?.data?.erro };
+    }
+  }
+}));
+
+// ─── TAREFAS ─────────────────────────────────────────────────────────────────
 export const useTarefasStore = create((set) => ({
   tarefas: [],
   loading: false,
@@ -127,7 +171,9 @@ export const useTarefasStore = create((set) => ({
 
   atualizarTarefa: async (id, tarefa) => {
     try {
-      await api.put(`/tarefas/${id}`, tarefa);
+      // FIX: envia apenas os campos que o backend espera
+      const { Tarefa, Prioridade, Prazo, Status, FK_Job, FK_Cliente } = tarefa;
+      await api.put(`/tarefas/${id}`, { Tarefa, Prioridade, Prazo: Prazo || null, Status, FK_Job: FK_Job || null, FK_Cliente: FK_Cliente || null });
       const { data } = await api.get('/tarefas');
       set({ tarefas: data });
       return { sucesso: true };
@@ -148,6 +194,7 @@ export const useTarefasStore = create((set) => ({
   }
 }));
 
+// ─── JOBS ────────────────────────────────────────────────────────────────────
 export const useJobsStore = create((set) => ({
   jobs: [],
   loading: false,
@@ -165,7 +212,9 @@ export const useJobsStore = create((set) => ({
 
   adicionarJob: async (job) => {
     try {
-      await api.post('/jobs', job);
+      // FIX: envia apenas FK_Campanha (modelo SaaS — cliente vem pelo join da campanha)
+      const { Descricao, Status, FK_Campanha } = job;
+      await api.post('/jobs', { Descricao, Status, FK_Campanha });
       const { data } = await api.get('/jobs');
       set({ jobs: data });
       return { sucesso: true };
@@ -176,7 +225,8 @@ export const useJobsStore = create((set) => ({
 
   atualizarJob: async (id, job) => {
     try {
-      await api.put(`/jobs/${id}`, job);
+      const { Descricao, Status, FK_Campanha } = job;
+      await api.put(`/jobs/${id}`, { Descricao, Status, FK_Campanha });
       const { data } = await api.get('/jobs');
       set({ jobs: data });
       return { sucesso: true };
@@ -197,7 +247,8 @@ export const useJobsStore = create((set) => ({
   }
 }));
 
-export const usePagamentosStore = create((set) => ({
+// ─── PAGAMENTOS ──────────────────────────────────────────────────────────────
+export const usePagamentosStore = create((set, get) => ({
   pagamentos: [],
   stats: null,
   loading: false,
@@ -227,6 +278,8 @@ export const usePagamentosStore = create((set) => ({
       await api.post('/pagamentos', pagamento);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
+      // FIX: atualiza stats automaticamente após adicionar
+      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
@@ -238,6 +291,7 @@ export const usePagamentosStore = create((set) => ({
       await api.put(`/pagamentos/${id}`, pagamento);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
+      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
@@ -249,50 +303,11 @@ export const usePagamentosStore = create((set) => ({
       await api.delete(`/pagamentos/${id}`);
       const { data } = await api.get('/pagamentos');
       set({ pagamentos: data });
+      // FIX: atualiza stats automaticamente após deletar
+      get().fetchStats();
       return { sucesso: true };
     } catch (error) {
       return { sucesso: false, erro: error.response?.data?.erro };
     }
-  }
-}));
-
-export const useCampanhasStore = create((set) => ({
-  campanhas: [],
-  loading: false,
-
-  fetchCampanhas: async (cliente_id = null) => {
-    set({ loading: true });
-    try {
-      const params = cliente_id ? { cliente_id } : {};
-      const { data } = await api.get('/campanhas', { params });
-      set({ campanhas: data, loading: false });
-    } catch (error) { set({ loading: false }); }
-  },
-
-  adicionarCampanha: async (campanha) => {
-    try {
-      await api.post('/campanhas', campanha);
-      const { data } = await api.get('/campanhas');
-      set({ campanhas: data });
-      return { sucesso: true };
-    } catch (error) { return { sucesso: false, erro: error.response?.data?.erro }; }
-  },
-
-  atualizarCampanha: async (id, campanha) => {
-    try {
-      await api.put(`/campanhas/${id}`, campanha);
-      const { data } = await api.get('/campanhas');
-      set({ campanhas: data });
-      return { sucesso: true };
-    } catch (error) { return { sucesso: false, erro: error.response?.data?.erro }; }
-  },
-
-  deletarCampanha: async (id) => {
-    try {
-      await api.delete(`/campanhas/${id}`);
-      const { data } = await api.get('/campanhas');
-      set({ campanhas: data });
-      return { sucesso: true };
-    } catch (error) { return { sucesso: false, erro: error.response?.data?.erro }; }
   }
 }));

@@ -14,17 +14,14 @@ export default function CampanhaDetalhes() {
   const [erro, setErro] = useState('');
   const [form, setForm] = useState({ Descricao: '', Status: 'Pendente', FK_Campanha: id });
 
-  useEffect(() => { fetchCampanhas(); fetchJobs(); }, []);
+  // FIX: unificado em um único useEffect (antes havia React.useEffect misturado com useEffect)
+  useEffect(() => {
+    fetchCampanhas();
+    fetchJobs();
+  }, []);
 
   const campanha = (Array.isArray(campanhas) ? campanhas : []).find(c => String(c.ID) === id);
   const jobsDaCampanha = (Array.isArray(jobs) ? jobs : []).filter(j => String(j.FK_Campanha) === id);
-
-  // Auto-preenche FK_Cliente com o cliente da campanha
-  React.useEffect(() => {
-    if (campanha?.FK_Cliente) {
-      setForm(f => ({ ...f, FK_Cliente: String(campanha.FK_Cliente) }));
-    }
-  }, [campanha]);
 
   const salvar = async (e) => {
     e.preventDefault();
@@ -55,9 +52,10 @@ export default function CampanhaDetalhes() {
             </div>
             <div>
               <h1 className="text-2xl font-black italic uppercase tracking-tighter leading-tight">{campanha.Nome}</h1>
+              {/* FIX: padronizado para NomeCliente com fallback */}
               <p onClick={() => campanha.FK_Cliente && nav(`/clientes/${campanha.FK_Cliente}`)}
                 className={`text-[10px] text-slate-500 font-black uppercase tracking-widest ${campanha.FK_Cliente ? 'cursor-pointer hover:text-cyan-400 transition-colors' : ''}`}>
-                {campanha.ClienteNome || campanha.NomeCliente || 'Cliente Geral'}
+                {campanha.NomeCliente || campanha.ClienteNome || 'Cliente Geral'}
               </p>
             </div>
           </div>
@@ -84,7 +82,8 @@ export default function CampanhaDetalhes() {
                 className={`p-4 ${theme.cardInner} flex justify-between items-center hover:border-cyan-500 cursor-pointer transition-all group`}>
                 <div>
                   <p className="font-black uppercase text-sm group-hover:text-cyan-400 transition-colors italic">{job.Descricao}</p>
-                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{job.ClienteNome || '---'}</p>
+                  {/* FIX: NomeCliente padronizado */}
+                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1">{job.NomeCliente || '---'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase border ${
@@ -107,7 +106,7 @@ export default function CampanhaDetalhes() {
             <h2 className="text-xl font-black mb-6 italic uppercase tracking-tighter">Novo Job</h2>
             {erro && <div className={theme.erro}>{erro}</div>}
             <div className="mb-4 p-3 bg-slate-900/50 border border-slate-700/50 rounded-xl text-xs text-slate-500 font-bold uppercase">
-              Cliente: <span className="text-slate-300">{campanha?.ClienteNome || campanha?.NomeCliente || 'Vinculado à campanha'}</span>
+              Cliente: <span className="text-slate-300">{campanha?.NomeCliente || campanha?.ClienteNome || 'Vinculado à campanha'}</span>
             </div>
             <form onSubmit={salvar} className="space-y-4">
               <input type="text" placeholder="Descrição *" required

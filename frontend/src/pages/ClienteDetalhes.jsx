@@ -12,7 +12,8 @@ export default function ClienteDetalhes() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [erro, setErro] = useState('');
-  const [form, setForm] = useState({ Nome: '', Status: 'Ativa', DataInicio: '', FK_Cliente: id });
+  const hoje = new Date().toISOString().split('T')[0];
+  const [form, setForm] = useState({ Nome: '', Status: 'Ativa', DataInicio: hoje, FK_Cliente: id });
 
   useEffect(() => { fetchClientes(); fetchCampanhas(); }, []);
 
@@ -25,7 +26,8 @@ export default function ClienteDetalhes() {
     const resultado = await adicionarCampanha({ ...form, FK_Cliente: id });
     if (resultado?.sucesso) {
       setModalOpen(false);
-      setForm({ Nome: '', Status: 'Ativa', DataInicio: '', FK_Cliente: id });
+      setForm({ Nome: '', Status: 'Ativa', DataInicio: hoje, FK_Cliente: id });
+      fetchCampanhas();
     } else {
       setErro(resultado?.erro || 'Erro ao salvar.');
     }

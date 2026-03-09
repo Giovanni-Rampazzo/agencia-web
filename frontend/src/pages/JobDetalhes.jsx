@@ -29,7 +29,7 @@ export default function JobDetalhes() {
   const salvarT = async (e) => {
     e.preventDefault();
     setErroT('');
-    const resultado = await adicionarTarefa({ ...nT, FK_Job: id, FK_Cliente: job?.FK_Cliente, Status: 'Pendente' });
+    const resultado = await adicionarTarefa({ ...nT, FK_Job: id, Status: 'Pendente' });
     if (resultado?.sucesso) {
       setModalT(false);
       setNT({ Tarefa: '', Prioridade: 'Média' });
@@ -41,7 +41,7 @@ export default function JobDetalhes() {
   const salvarP = async (e) => {
     e.preventDefault();
     setErroP('');
-    const resultado = await adicionarPagamento({ ...nP, FK_Job: id, FK_Cliente: job?.FK_Cliente });
+    const resultado = await adicionarPagamento({ ...nP, FK_Job: id });
     if (resultado?.sucesso) {
       setModalP(false);
       setNP({ Descricao: '', Valor: '', Data: '', Status: 'Pendente' });
@@ -67,20 +67,21 @@ export default function JobDetalhes() {
             </div>
             <div>
               <h1 className="text-xl font-black italic uppercase leading-tight tracking-tighter">{job.Descricao}</h1>
-              <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-widest">{job.ClienteNome || '---'}</p>
+              {/* FIX: padronizado para NomeCliente */}
+              <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-widest">{job.NomeCliente || '---'}</p>
             </div>
           </div>
           <div className="space-y-3 border-t border-slate-700/50 pt-4 text-[10px] font-black uppercase">
             <div className="flex justify-between"><span className="text-slate-500">Status</span><span className="text-cyan-400">{job.Status}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Campanha</span>
               {job.FK_Campanha ? (
-                <span onClick={() => nav(`/campanhas/${job.FK_Campanha}`)} className="text-indigo-400 cursor-pointer hover:underline italic">{job.CampanhaNome || 'Ver'}</span>
+                <span onClick={() => nav(`/campanhas/${job.FK_Campanha}`)} className="text-indigo-400 cursor-pointer hover:underline italic">{job.NomeCampanha || 'Ver'}</span>
               ) : (
                 <span className="text-slate-600 italic">N/A</span>
               )}
             </div>
             <div className="flex justify-between"><span className="text-slate-500">Cliente</span>
-              <span onClick={() => nav(`/clientes/${job.FK_Cliente}`)} className="text-cyan-400 cursor-pointer hover:underline italic">{job.ClienteNome || 'Ver'}</span>
+              <span className="text-cyan-400 italic">{job.NomeCliente || '---'}</span>
             </div>
           </div>
         </div>
@@ -93,7 +94,7 @@ export default function JobDetalhes() {
               <h2 className="text-lg font-black italic flex items-center gap-2 uppercase tracking-tighter">
                 <CheckCircle2 size={18} className="text-cyan-400" /> Tarefas
               </h2>
-              <button onClick={() => setModalT(true)} className="p-2 bg-cyan-600 rounded-xl hover:bg-cyan-500 text-white transition-all shadow-sm shadow-cyan-900/10"><Plus size={16}/></button>
+              <button onClick={() => setModalT(true)} className="p-2 bg-cyan-600 rounded-xl hover:bg-cyan-500 text-white transition-all"><Plus size={16}/></button>
             </div>
             <div className="space-y-2">
               {tas.map(t => (
@@ -114,15 +115,12 @@ export default function JobDetalhes() {
               <h2 className="text-lg font-black italic flex items-center gap-2 uppercase tracking-tighter">
                 <DollarSign size={18} className="text-emerald-400" /> Financeiro
               </h2>
-              <button onClick={() => setModalP(true)} className="p-2 bg-emerald-600 rounded-xl hover:bg-emerald-500 text-white transition-all shadow-sm shadow-emerald-900/10"><Plus size={16}/></button>
+              <button onClick={() => setModalP(true)} className="p-2 bg-emerald-600 rounded-xl hover:bg-emerald-500 text-white transition-all"><Plus size={16}/></button>
             </div>
             <div className="space-y-2">
               {pgs.map(p => (
-                <div
-                  key={p.ID}
-                  onClick={() => nav(`/pagamentos/${p.ID}`)}
-                  className="p-3 bg-slate-900/30 border border-slate-700 rounded-2xl flex justify-between items-center hover:border-emerald-500 cursor-pointer transition-all group"
-                >
+                <div key={p.ID} onClick={() => nav(`/pagamentos/${p.ID}`)}
+                  className="p-3 bg-slate-900/30 border border-slate-700 rounded-2xl flex justify-between items-center hover:border-emerald-500 cursor-pointer transition-all group">
                   <div>
                     <p className="font-black text-sm group-hover:text-emerald-400 transition-colors italic">{p.Descricao || 'Pagamento'}</p>
                     <p className="text-emerald-400 font-black text-sm">{fmt(p.Valor)}</p>
@@ -175,6 +173,7 @@ export default function JobDetalhes() {
               <input type="text" placeholder="Ex: Parcela 01 *" required
                 className={`${theme.input} focus:border-emerald-500`}
                 value={nP.Descricao} onChange={e => setNP({...nP, Descricao: e.target.value})} />
+              {/* FIX: campo Data mantido e obrigatório (backend exige) */}
               <input type="date" required
                 className={`${theme.input} focus:border-emerald-500`}
                 value={nP.Data} onChange={e => setNP({...nP, Data: e.target.value})} />

@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useClientesStore, useTarefasStore, useCampanhasStore, useJobsStore, usePagamentosStore, useAuthStore } from '../store';
+import { useClientesStore, useTarefasStore, useCampanhasStore, useJobsStore, usePagamentosStore, useAuthStore } from './store';
 import { Users, CheckSquare, DollarSign, TrendingUp, Megaphone, Briefcase } from 'lucide-react';
-import { theme } from '../theme';
+import { theme } from './theme';
 
 const fmt = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 

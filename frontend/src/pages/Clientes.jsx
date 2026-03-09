@@ -1,109 +1,327 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useClientesStore } from '../store';
-import { Search, Building2, Mail, Phone, Trash2 } from 'lucide-react';
-import { theme } from '../theme';
+import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 
 export default function Clientes() {
-  const nav = useNavigate();
-  const { clientes: cR, fetchClientes, adicionarCliente, deletarCliente } = useClientesStore();
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState(false);
+  const {
+    clientes,
+    loading,
+    fetchClientes,
+    adicionarCliente,
+    atualizarCliente,
+    deletarCliente
+  } = useClientesStore();
+
+  const [busca, setBusca] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [erro, setErro] = useState('');
-  const [form, setForm] = useState({ Empresa: '', Email: '', Telefone: '', Status: 'Ativo', Endereco: '' });
+  const [formulario, setFormulario] = useState({
+    Empresa: '',
+    Email: '',
+    Telefone: '',
+    Status: 'Ativo',
+    Endereco: ''
+  });
 
-  useEffect(() => { fetchClientes(); }, []);
+  useEffect(() => {
+    fetchClientes();
+  }, []);
 
-  const lista = (Array.isArray(cR) ? cR : []).filter(c =>
-    c.Empresa.toLowerCase().includes(q.toLowerCase()) ||
-    (c.Email && c.Email.toLowerCase().includes(q.toLowerCase()))
-  );
+  const clientesFiltrados = clientes.filter((cliente) => {
+    const matchBusca =
+      cliente.Empresa.toLowerCase().includes(busca.toLowerCase()) ||
+      cliente.Email?.toLowerCase().includes(busca.toLowerCase());
+    const matchStatus = !statusFiltro || cliente.Status === statusFiltro;
+    return matchBusca && matchStatus;
+  });
 
-  const salvar = async (e) => {
-    e.preventDefault();
-    setErro('');
-    const resultado = await adicionarCliente(form);
-    if (resultado?.sucesso) {
-      setOpen(false);
-      setForm({ Empresa: '', Email: '', Telefone: '', Status: 'Ativo', Endereco: '' });
+  const handleAbrir = (cliente = null) => {
+    if (cliente) {
+      setFormulario(cliente);
+      setEditando(cliente.ID);
     } else {
-      setErro(resultado?.erro || 'Erro ao salvar cliente');
+      setFormulario({
+        Empresa: '',
+        Email: '',
+        Telefone: '',
+        Status: 'Ativo',
+        Endereco: ''
+      });
+      setEditando(null);
+    }
+    setModalOpen(true);
+    setErro('');
+  };
+
+  const handleSalvar = async (e) => {
+    e.preventDefault();
+    if (!formulario.Empresa) {
+      setErro('Empresa é obrigatória');
+      return;
+    }
+
+    const resultado = editando
+      ? await atualizarCliente(editando, formulario)
+      : await adicionarCliente(formulario);
+
+    if (resultado.sucesso) {
+      setModalOpen(false);
+      await fetchClientes();
+    } else {
+      setErro(resultado.erro);
     }
   };
 
-  const excluir = async (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Excluir este cliente e todos os seus dados?')) {
-      await deletarCliente(id);
+  const handleDeletar = async (id) => {
+    if (window.confirm('Tem certeza que deseja deletar este cliente?')) {
+      const resultado = await deletarCliente(id);
+      if (resultado.sucesso) {
+        await fetchClientes();
+      }
     }
+  };
+
+  const getStatusColor = (status) => {
+    const cores = {
+      'Ativo': 'bg-green-500/20 text-green-300',
+      'Inativo': 'bg-red-500/20 text-red-300',
+      'Pendente': 'bg-yellow-500/20 text-yellow-300'
+    };
+    return cores[status] || 'bg-slate-500/20 text-slate-300';
   };
 
   return (
-    <div className="p-6 space-y-6 text-white max-w-7xl mx-auto font-sans">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-black italic tracking-tighter uppercase">Clientes</h1>
-        <button onClick={() => setOpen(true)} className={theme.headerBtnCyan}>
-          + Novo Cliente
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Clientes</h1>
+          <p className="text-slate-400 mt-1">
+            {clientes.length} cliente{clientes.length !== 1 ? 's' : ''} cadastrado{clientes.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <button
+          onClick={() => handleAbrir()}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
+        >
+          <Plus size={20} />
+          Novo Cliente
         </button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-slate-500" size={18} />
-        <input type="text" placeholder="Buscar empresa ou email..." className="w-full pl-10 p-3 bg-slate-800 border border-slate-700 rounded-2xl outline-none focus:border-cyan-500 text-sm" onChange={e => setQ(e.target.value)} />
+      {/* Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar por empresa ou email..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+          />
+        </div>
+        <select
+          value={statusFiltro}
+          onChange={(e) => setStatusFiltro(e.target.value)}
+          className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+        >
+          <option value="">Todos os Status</option>
+          <option value="Ativo">Ativo</option>
+          <option value="Inativo">Inativo</option>
+          <option value="Pendente">Pendente</option>
+        </select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {lista.map(c => (
-          <div key={c.ID} onClick={() => nav(`/clientes/${c.ID}`)} className={`${theme.card} ${theme.cardHover} p-5 relative overflow-hidden hover:border-cyan-500`}>
-            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={(e) => excluir(c.ID, e)} className="text-slate-500 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
-            </div>
-            <div className="flex items-start gap-4 mb-4">
-              <div className="p-3 bg-slate-900 rounded-2xl text-cyan-400 border border-slate-700"><Building2 size={24} /></div>
-              <div>
-                <h3 className="font-black text-lg leading-tight group-hover:text-cyan-400 transition-colors uppercase italic">{c.Empresa}</h3>
-                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${c.Status === 'Ativo' ? 'border-emerald-500/30 text-emerald-500 bg-emerald-500/10' : 'border-slate-600 text-slate-500 bg-slate-700/30'}`}>{c.Status}</span>
+      {/* Tabela */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-slate-900 border-b border-slate-700">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">
+                  Empresa
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">
+                  Email
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">
+                  Telefone
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-slate-300">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-right text-sm font-semibold text-slate-300">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                    Carregando...
+                  </td>
+                </tr>
+              ) : clientesFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                    Nenhum cliente encontrado
+                  </td>
+                </tr>
+              ) : (
+                clientesFiltrados.map((cliente) => (
+                  <tr
+                    key={cliente.ID}
+                    className="border-b border-slate-700 hover:bg-slate-700/50 transition-colors"
+                  >
+                    <td className="px-6 py-4">
+                      <p className="text-white font-medium">{cliente.Empresa}</p>
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {cliente.Email || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300">
+                      {cliente.Telefone || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                          cliente.Status
+                        )}`}
+                      >
+                        {cliente.Status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleAbrir(cliente)}
+                          className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-cyan-400 hover:text-cyan-300"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDeletar(cliente.ID)}
+                          className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-6">
+              {editando ? 'Editar Cliente' : 'Novo Cliente'}
+            </h2>
+
+            {erro && (
+              <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
+                <p className="text-red-300 text-sm">{erro}</p>
               </div>
-            </div>
-            <div className="space-y-2 border-t border-slate-700/50 pt-4 text-xs text-slate-400 font-bold">
-              <div className="flex items-center gap-2"><Mail size={14} className="text-slate-600" /> {c.Email || '---'}</div>
-              <div className="flex items-center gap-2"><Phone size={14} className="text-slate-600" /> {c.Telefone || '---'}</div>
-            </div>
-          </div>
-        ))}
-        {lista.length === 0 && (
-          <div className="col-span-3 text-center py-12 text-slate-600 text-sm font-bold uppercase italic">Nenhum cliente encontrado</div>
-        )}
-      </div>
+            )}
 
-      {open && (
-        <div className={theme.overlay}>
-          <div className={theme.modal}>
-            <h2 className="text-xl font-black mb-6 italic uppercase tracking-tighter">Novo Cliente</h2>
-            {erro && <div className={theme.erro}>{erro}</div>}
-            <form onSubmit={salvar} className="space-y-4">
-              <input type="text" placeholder="Nome da Empresa *" required
-                className={`${theme.input} focus:border-cyan-500`}
-                value={form.Empresa} onChange={e => setForm({...form, Empresa: e.target.value})} />
-              <input type="email" placeholder="Email"
-                className={`${theme.input} focus:border-cyan-500`}
-                value={form.Email} onChange={e => setForm({...form, Email: e.target.value})} />
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Telefone"
-                  className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white outline-none"
-                  value={form.Telefone} onChange={e => setForm({...form, Telefone: e.target.value})} />
-                <select className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none"
-                  value={form.Status} onChange={e => setForm({...form, Status: e.target.value})}>
-                  <option value="Ativo">Ativo</option>
-                  <option value="Inativo">Inativo</option>
+            <form onSubmit={handleSalvar} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Empresa *
+                </label>
+                <input
+                  type="text"
+                  value={formulario.Empresa}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Empresa: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formulario.Email || ''}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Email: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Telefone
+                </label>
+                <input
+                  type="tel"
+                  value={formulario.Telefone || ''}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Telefone: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Status
+                </label>
+                <select
+                  value={formulario.Status}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Status: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                >
+                  <option>Ativo</option>
+                  <option>Inativo</option>
+                  <option>Pendente</option>
                 </select>
               </div>
-              <input type="text" placeholder="Endereço"
-                className={theme.input}
-                value={form.Endereco} onChange={e => setForm({...form, Endereco: e.target.value})} />
-              <div className="flex gap-2 pt-4">
-                <button type="button" onClick={() => { setOpen(false); setErro(''); }} className={theme.btnCancel}>Cancelar</button>
-                <button type="submit" className={theme.btnCyan}>Salvar</button>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Endereço
+                </label>
+                <input
+                  type="text"
+                  value={formulario.Endereco || ''}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Endereco: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  Salvar
+                </button>
               </div>
             </form>
           </div>

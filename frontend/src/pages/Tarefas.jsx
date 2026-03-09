@@ -1,135 +1,277 @@
 import React, { useState, useEffect } from 'react';
-import { useTarefasStore, useClientesStore } from '../store';
-import { CheckSquare, Search, Trash2 } from 'lucide-react';
-import { theme } from '../theme';
+import { useTarefasStore } from '../store';
+import { Plus, Edit2, Trash2, Search } from 'lucide-react';
 
 export default function Tarefas() {
-  const { tarefas: tR, fetchTarefas, adicionarTarefa, atualizarTarefa, deletarTarefa } = useTarefasStore();
-  const { clientes: clR, fetchClientes } = useClientesStore();
+  const {
+    tarefas,
+    loading,
+    fetchTarefas,
+    adicionarTarefa,
+    atualizarTarefa,
+    deletarTarefa
+  } = useTarefasStore();
 
-  const [q, setQ] = useState('');
-  const [open, setOpen] = useState(false);
+  const [busca, setBusca] = useState('');
+  const [prioridadeFiltro, setPrioridadeFiltro] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState(null);
   const [erro, setErro] = useState('');
-  const [form, setForm] = useState({ Tarefa: '', Prioridade: 'Média', Status: 'Pendente', FK_Cliente: '' });
+  const [formulario, setFormulario] = useState({
+    Tarefa: '',
+    Prioridade: 'Média',
+    Prazo: '',
+    Status: 'Pendente'
+  });
 
-  useEffect(() => { fetchTarefas(); fetchClientes(); }, []);
+  useEffect(() => {
+    fetchTarefas();
+  }, []);
 
-  const lista = (Array.isArray(tR) ? tR : []).filter(t => t.Tarefa?.toLowerCase().includes(q.toLowerCase()));
-  const clis = Array.isArray(clR) ? clR : [];
+  const tarefasFiltradas = tarefas.filter((tarefa) => {
+    const matchBusca = tarefa.Tarefa.toLowerCase().includes(busca.toLowerCase());
+    const matchPrioridade = !prioridadeFiltro || tarefa.Prioridade === prioridadeFiltro;
+    return matchBusca && matchPrioridade;
+  });
 
-  const salvar = async (e) => {
-    e.preventDefault();
-    setErro('');
-    const resultado = await adicionarTarefa(form);
-    if (resultado?.sucesso) {
-      setOpen(false);
-      setForm({ Tarefa: '', Prioridade: 'Média', Status: 'Pendente', FK_Cliente: '' });
+  const handleAbrir = (tarefa = null) => {
+    if (tarefa) {
+      setFormulario(tarefa);
+      setEditando(tarefa.ID);
     } else {
-      setErro(resultado?.erro || 'Erro ao salvar tarefa');
+      setFormulario({
+        Tarefa: '',
+        Prioridade: 'Média',
+        Prazo: '',
+        Status: 'Pendente'
+      });
+      setEditando(null);
+    }
+    setModalOpen(true);
+    setErro('');
+  };
+
+  const handleSalvar = async (e) => {
+    e.preventDefault();
+    if (!formulario.Tarefa) {
+      setErro('Tarefa é obrigatória');
+      return;
+    }
+
+    const resultado = editando
+      ? await atualizarTarefa(editando, formulario)
+      : await adicionarTarefa(formulario);
+
+    if (resultado.sucesso) {
+      setModalOpen(false);
+      await fetchTarefas();
+    } else {
+      setErro(resultado.erro);
     }
   };
 
-  const alternarStatus = async (t) => {
-    const novoStatus = t.Status === 'Concluído' ? 'Pendente' : 'Concluído';
-    await atualizarTarefa(t.ID, { ...t, Status: novoStatus });
-  };
-
-  const excluir = async (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Excluir esta tarefa?')) {
-      await deletarTarefa(id);
+  const handleDeletar = async (id) => {
+    if (window.confirm('Tem certeza que deseja deletar esta tarefa?')) {
+      const resultado = await deletarTarefa(id);
+      if (resultado.sucesso) {
+        await fetchTarefas();
+      }
     }
   };
 
-  const pendentes = lista.filter(t => t.Status !== 'Concluído');
-  const concluidas = lista.filter(t => t.Status === 'Concluído');
+  const getPrioridadeColor = (prioridade) => {
+    const cores = {
+      'Alta': 'bg-red-500/20 text-red-300',
+      'Média': 'bg-yellow-500/20 text-yellow-300',
+      'Baixa': 'bg-green-500/20 text-green-300'
+    };
+    return cores[prioridade] || 'bg-slate-500/20 text-slate-300';
+  };
 
   return (
-    <div className="p-6 space-y-6 text-white max-w-5xl mx-auto font-sans">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-black italic tracking-tighter uppercase">Tarefas</h1>
-        <button onClick={() => setOpen(true)} className={theme.headerBtnCyan}>
-          + Nova Tarefa
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Tarefas</h1>
+          <p className="text-slate-400 mt-1">
+            {tarefas.filter(t => t.Status === 'Pendente').length} pendente{tarefas.filter(t => t.Status === 'Pendente').length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <button
+          onClick={() => handleAbrir()}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-lg font-medium transition-all shadow-lg hover:shadow-xl"
+        >
+          <Plus size={20} />
+          Nova Tarefa
         </button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 text-slate-500" size={18} />
-        <input type="text" placeholder="Buscar tarefa..." className="w-full pl-10 p-3 bg-slate-800 border border-slate-700 rounded-2xl outline-none focus:border-cyan-500 text-sm" onChange={e => setQ(e.target.value)} />
+      {/* Filtros */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="relative">
+          <Search size={18} className="absolute left-3 top-3 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar tarefas..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+          />
+        </div>
+        <select
+          value={prioridadeFiltro}
+          onChange={(e) => setPrioridadeFiltro(e.target.value)}
+          className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+        >
+          <option value="">Todas as Prioridades</option>
+          <option value="Alta">Alta</option>
+          <option value="Média">Média</option>
+          <option value="Baixa">Baixa</option>
+        </select>
       </div>
 
-      {pendentes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Pendentes ({pendentes.length})</p>
-          {pendentes.map(t => (
-            <div key={t.ID} className={`${theme.card} p-4 flex items-center justify-between hover:border-slate-500 transition-all group`}>
-              <div className="flex items-center gap-4">
-                <button onClick={() => alternarStatus(t)} className="p-2 rounded-xl bg-slate-700 text-slate-500 hover:text-white hover:bg-cyan-600 transition-all">
-                  <CheckSquare size={18} />
-                </button>
-                <div>
-                  <p className="font-bold text-sm text-slate-100">{t.Tarefa}</p>
-                  <p className="text-[9px] text-cyan-500 font-black uppercase tracking-widest mt-0.5">{t.ClienteNome || 'Geral'}</p>
+      {/* Tarefas */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="text-center py-8 text-slate-400">Carregando...</div>
+        ) : tarefasFiltradas.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">Nenhuma tarefa encontrada</div>
+        ) : (
+          tarefasFiltradas.map((tarefa) => (
+            <div
+              key={tarefa.ID}
+              className="bg-slate-800 border border-slate-700 rounded-lg p-6 hover:border-slate-600 transition-all"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    {tarefa.Tarefa}
+                  </h3>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className={`px-3 py-1 rounded-full font-medium ${getPrioridadeColor(tarefa.Prioridade)}`}>
+                      {tarefa.Prioridade}
+                    </span>
+                    {tarefa.Prazo && (
+                      <span className="text-slate-400">
+                        Prazo: {new Date(tarefa.Prazo).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                    <span className="text-slate-400">Status: {tarefa.Status}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleAbrir(tarefa)}
+                    className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-cyan-400 hover:text-cyan-300"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDeletar(tarefa.ID)}
+                    className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-red-400 hover:text-red-300"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border ${
-                  t.Prioridade === 'Alta' ? 'border-red-500/30 text-red-500 bg-red-500/10' :
-                  t.Prioridade === 'Média' ? 'border-yellow-500/30 text-yellow-500 bg-yellow-500/10' :
-                  'border-slate-600 text-slate-400 bg-slate-700/30'}`}>{t.Prioridade}</span>
-                <button onClick={(e) => excluir(t.ID, e)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
-              </div>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {concluidas.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-1">Concluídas ({concluidas.length})</p>
-          {concluidas.map(t => (
-            <div key={t.ID} className="bg-slate-800/40 border border-slate-700/50 p-4 rounded-2xl flex items-center justify-between group opacity-60 hover:opacity-80 transition-all">
-              <div className="flex items-center gap-4">
-                <button onClick={() => alternarStatus(t)} className="p-2 rounded-xl bg-emerald-600 text-white transition-all">
-                  <CheckSquare size={18} />
+      {/* Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold text-white mb-6">
+              {editando ? 'Editar Tarefa' : 'Nova Tarefa'}
+            </h2>
+
+            {erro && (
+              <div className="p-4 bg-red-900/30 border border-red-700 rounded-lg mb-4">
+                <p className="text-red-300 text-sm">{erro}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSalvar} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Tarefa *
+                </label>
+                <textarea
+                  value={formulario.Tarefa}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Tarefa: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  rows="3"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Prioridade
+                </label>
+                <select
+                  value={formulario.Prioridade}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Prioridade: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                >
+                  <option>Alta</option>
+                  <option>Média</option>
+                  <option>Baixa</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Prazo
+                </label>
+                <input
+                  type="date"
+                  value={formulario.Prazo || ''}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Prazo: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-2">
+                  Status
+                </label>
+                <select
+                  value={formulario.Status}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, Status: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                >
+                  <option>Pendente</option>
+                  <option>Em Progresso</option>
+                  <option>Concluído</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  Cancelar
                 </button>
-                <p className="font-bold text-sm text-slate-500 line-through">{t.Tarefa}</p>
-              </div>
-              <button onClick={(e) => excluir(t.ID, e)} className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 transition-all"><Trash2 size={14}/></button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {lista.length === 0 && (
-        <div className="text-center py-12 text-slate-600 text-sm font-bold uppercase italic">Nenhuma tarefa encontrada</div>
-      )}
-
-      {open && (
-        <div className={theme.overlay}>
-          <div className={theme.modal}>
-            <h2 className="text-xl font-black mb-6 italic uppercase tracking-tighter">Nova Tarefa</h2>
-            {erro && <div className={theme.erro}>{erro}</div>}
-            <form onSubmit={salvar} className="space-y-4">
-              <input type="text" placeholder="O que precisa ser feito? *" required
-                className={`${theme.input} focus:border-cyan-500`}
-                value={form.Tarefa} onChange={e => setForm({...form, Tarefa: e.target.value})} />
-              <div className="grid grid-cols-2 gap-3">
-                <select className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none"
-                  value={form.Prioridade} onChange={e => setForm({...form, Prioridade: e.target.value})}>
-                  <option value="Alta">Prioridade: Alta</option>
-                  <option value="Média">Prioridade: Média</option>
-                  <option value="Baixa">Prioridade: Baixa</option>
-                </select>
-                <select className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none"
-                  value={form.FK_Cliente} onChange={e => setForm({...form, FK_Cliente: e.target.value})}>
-                  <option value="">Vincular Cliente...</option>
-                  {clis.map(c => <option key={c.ID} value={c.ID}>{c.Empresa}</option>)}
-                </select>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <button type="button" onClick={() => { setOpen(false); setErro(''); }} className={theme.btnCancel}>Cancelar</button>
-                <button type="submit" className={theme.btnCyan}>Criar</button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors font-medium"
+                >
+                  Salvar
+                </button>
               </div>
             </form>
           </div>
